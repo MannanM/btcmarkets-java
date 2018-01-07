@@ -1,0 +1,28 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'checkstyle'
+    id 'maven-publish'
+}
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.9.3'
+    compile 'org.apache.httpcomponents:httpclient:4.5.4'
+    testCompile 'junit:junit:4.12'
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId 'com.mannanlive'
+            artifactId 'btcmarkets-java'
+            version '0.1'
+
+            from components.java
+        }
+    }
+}
