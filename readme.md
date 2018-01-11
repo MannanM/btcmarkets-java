@@ -55,7 +55,8 @@ public interface BtcMarketsDao {
 
 ```java
 BtcMarketsDao dao = new DefaultBtcMarketsDao("api-key", "private-key");
-PlaceOrderResponse response = dao.placeOrder(new Order(Instrument.BTC, Currency.AUD, 20000.00, 1.0, "request-7", OrderSide.ASK, OrderType.LIMIT));
+Order order = new Order(Instrument.BTC, Currency.AUD, 20000.00, 1.0, "request-7", OrderSide.ASK, OrderType.LIMIT);
+PlaceOrderResponse response = dao.placeOrder(order);
 System.out.println("The order id is: " + response.getId());
 ```
 

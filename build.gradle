@@ -1,12 +1,20 @@
 plugins {
     id 'java'
     id 'idea'
+    id 'signing'
     id 'checkstyle'
     id 'maven-publish'
 }
 
+group = 'com.mannanlive'
+version = '0.1'
+rootProject.description = 'BTC Markets.net Java API.'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
 repositories {
-    jcenter()
+    mavenCentral()
 }
 
 dependencies {
@@ -15,14 +23,123 @@ dependencies {
     testCompile 'junit:junit:4.12'
 }
 
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives jar
+    archives sourcesJar
+    archives javadocJar
+}
+
+signing {
+    sign configurations.archives
+}
+
 publishing {
     publications {
-        maven(MavenPublication) {
-            groupId 'com.mannanlive'
-            artifactId 'btcmarkets-java'
-            version '0.1'
-
+        mavenJava(MavenPublication) {
+            customizePom(pom, rootProject)
             from components.java
+
+            artifact sourcesJar
+            artifact javadocJar
+
+            // sign the pom
+            pom.withXml {
+                def pomFile = file("${project.buildDir}/generated-pom.xml")
+                writeTo(pomFile)
+                def pomAscFile = signing.sign(pomFile).signatureFiles[0]
+                artifact(pomAscFile) {
+                    classifier = null
+                    extension = 'pom.asc'
+                }
+                pomFile.delete()
+            }
+
+            // sign the artifacts
+            project.tasks.signArchives.signatureFiles.each {
+                artifact(it) {
+                    def matcher = it.file =~ /-(sources|javadoc)\.jar\.asc$/
+                    println it.file
+                    if (matcher.find()) {
+                        classifier = matcher.group(1)
+                    } else {
+                        classifier = null
+                    }
+                    extension = 'jar.asc'
+                }
+            }
         }
+    }
+
+    repositories {
+        maven {
+            url 'https://oss.sonatype.org/service/local/staging/deploy/maven2'
+            credentials {
+                username sonatypeUsername
+                password sonatypePassword
+            }
+        }
+    }
+}
+
+def customizePom(pom, gradleProject) {
+    pom.withXml {
+        def root = asNode()
+
+        // eliminate test-scoped dependencies (no need in maven central POMs)
+        root.dependencies.removeAll { dep ->
+            dep.scope == 'test'
+        }
+
+        // add all items necessary for maven central publication
+        root.children().last() + {
+            resolveStrategy = Closure.DELEGATE_FIRST
+
+            description gradleProject.description
+            name 'BTCMarkets-Java'
+            url 'https://github.com/MannanM/btcmarkets-java'
+            organization {
+                name 'Mannan Live'
+                url 'http://mannanlive.com'
+            }
+            licenses {
+                license {
+                    name 'The New BSD License'
+                    url 'https://github.com/MannanM/btcmarkets-java/blob/master/LICENSE'
+                    distribution 'repo'
+                }
+            }
+            scm {
+                url 'https://github.com/MannanM/btcmarkets-java'
+                connection 'scm:git:git://github.com/MannanM/btcmarkets-java.git'
+                developerConnection 'scm:git:ssh://git@github.com/MannanM/btcmarkets-java.git'
+            }
+            developers {
+                developer {
+                    id 'Mannan'
+                    name 'Mannan Mackie'
+                    email 'whatabout@gmail.com'
+                    timezone '+10'
+                }
+            }
+        }
+    }
+}
+
+model {
+    tasks.publishMavenJavaPublicationToMavenLocal {
+        dependsOn(project.tasks.signArchives)
+    }
+    tasks.publishMavenJavaPublicationToMavenRepository {
+        dependsOn(project.tasks.signArchives)
     }
 }
